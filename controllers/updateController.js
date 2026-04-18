@@ -1,9 +1,7 @@
 import asyncHandler from 'express-async-handler';
 import Update from '../models/Update.js';
 import User from '../models/User.js';
-import { Expo } from 'expo-server-sdk';
-
-const expo = new Expo();
+import { sendPushNotification } from '../utils/sendNotification.js';
 
 // @desc    Get all ward updates (public)
 // @route   GET /api/updates
@@ -31,31 +29,22 @@ const createUpdate = asyncHandler(async (req, res) => {
     mediaUrls: mediaUrls || [],
   });
 
-  // Fetch all push tokens to send notifications
-  const usersWithTokens = await User.find({ pushToken: { $exists: true, $ne: null } }).select('pushToken');
-  const tokens = usersWithTokens.map(u => u.pushToken).filter(token => Expo.isExpoPushToken(token));
+  // Fetch all push tokens to send notifications (FCM)
+  try {
+    const usersWithTokens = await User.find({ pushToken: { $exists: true, $ne: null } }).select('pushToken');
+    const tokens = usersWithTokens.map(u => u.pushToken);
 
-  let messages = [];
-  for (let pushToken of tokens) {
-    messages.push({
-      to: pushToken,
-      sound: 'default',
-      title: 'New Ward Update!',
-      body: title,
-      data: { updateId: update._id },
-    });
-  }
-
-  let chunks = expo.chunkPushNotifications(messages);
-  (async () => {
-    for (let chunk of chunks) {
-      try {
-        await expo.sendPushNotificationsAsync(chunk);
-      } catch (error) {
-        console.error('Push notification error:', error);
-      }
+    if (tokens.length > 0) {
+      await sendPushNotification(
+        tokens,
+        'Ward Update!',
+        title,
+        { updateId: update._id.toString(), type: 'WARD_UPDATE' }
+      );
     }
-  })();
+  } catch (err) {
+    console.error('Failed to send ward update notifications:', err);
+  }
 
   res.status(201).json(update);
 });

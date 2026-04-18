@@ -11,15 +11,30 @@ const userSchema = mongoose.Schema(
       type: String,
       required: true,
       unique: true,
+      lowercase: true,
+      trim: true,
     },
     phoneNumber: {
       type: String,
-      required: true,
+      required: false,
       unique: true,
+      sparse: true,
     },
     password: {
       type: String,
-      required: true,
+      required: false,
+    },
+    googleId: {
+      type: String,
+      required: false,
+    },
+    profilePic: {
+      type: String,
+      required: false,
+    },
+    firebaseUid: {
+      type: String,
+      required: false,
     },
     role: {
       type: String,
@@ -56,7 +71,7 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
 // Encrypt password using bcrypt
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) {
-    next();
+    return next();
   }
 
   const salt = await bcrypt.genSalt(10);

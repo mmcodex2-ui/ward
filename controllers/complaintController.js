@@ -1,5 +1,7 @@
 import asyncHandler from 'express-async-handler';
 import Complaint from '../models/Complaint.js';
+import User from '../models/User.js';
+import { sendPushNotification } from '../utils/sendNotification.js';
 
 // @desc    Create new complaint
 // @route   POST /api/complaints
@@ -63,6 +65,22 @@ const updateComplaintStatus = asyncHandler(async (req, res) => {
     }
 
     const updatedComplaint = await complaint.save();
+    
+    // Notify the user about the status update
+    try {
+       const userWithToken = await User.findById(complaint.user).select('pushToken');
+       if (userWithToken && userWithToken.pushToken) {
+          await sendPushNotification(
+            userWithToken.pushToken,
+            'Complaint Status Updated!',
+            `Your complaint "${complaint.title}" is now ${status}.`,
+            { complaintId: complaint._id.toString(), type: 'COMPLAINT_UPDATE' }
+          );
+       }
+    } catch (err) {
+       console.error('Failed to send status update notification:', err);
+    }
+
     res.json(updatedComplaint);
   } else {
     res.status(404);
